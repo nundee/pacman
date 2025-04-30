@@ -31,7 +31,7 @@
 
 .wall {
     background-color: var(--wall-color);
-    border-radius: 0px;
+    border-radius: 15%;
 }
 
 .dot {
