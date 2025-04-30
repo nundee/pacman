@@ -1,0 +1,125 @@
+@page "/"
+@rendermode InteractiveServer
+
+@using pacman.Models
+@using pacman.Components.Shared
+
+@implements IDisposable
+<div>
+    <Overlay IsVisible="@(countDown>0)">
+        <div style="color:white; font-size:128px">@countDown</div>
+    </Overlay>
+    <Overlay IsVisible="@((game?.IsGameOver).GetValueOrDefault(false))">
+        <div style="color:white; font-size:64px">Game Over!</div>>
+    </Overlay>
+    <div @ref="gameContainerRef" class="game-container" tabindex="0" @onkeydown="HandleKeyDown">
+        <table class="game-board">
+            <tbody>
+                @for (int r = 0; r < game.Board.Height; r++)
+                {
+                    <tr>
+                        @for (int c = 0; c < game.Board.Width; c++)
+                        {
+                            var tileType = game.Board[r,c];
+                            <td class="@GetTileClass(tileType)"></td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="game-info">
+            <div>Score: @game.Score</div>
+            <button class="btn" @onclick="StartStopGame">
+                @GetButtonText()
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private GameState? game=null;
+    private System.Threading.Timer? GameTimer;
+    ElementReference gameContainerRef;
+    private int countDown=0;
+
+
+    protected override void OnInitialized()
+    {
+        game = new GameState();
+        base.OnInitialized();
+    }
+
+    string GetButtonText()
+    {
+        return (game?.IsStarted).GetValueOrDefault(false) ? "Stop" : "Start";
+    }
+
+    void OnGameUpdate() => InvokeAsync(StateHasChanged); // Update the UI when the game state changes
+
+
+    async Task StartStopGame()
+    {
+        bool wasRunning = game?.IsStarted ?? false;
+        if (wasRunning)
+        {
+            // must stop the game
+            game!.Updated -= OnGameUpdate;
+            game.StopGame();
+            game.Dispose();
+            game = new GameState();
+        }
+        else
+        {
+            // must start the game
+            countDown = 3; // Set countdown to 3 seconds
+            await InvokeAsync(StateHasChanged); // Update the UI immediately)
+            var _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            while(countDown>0)
+            {
+                await _timer.WaitForNextTickAsync();
+                countDown--;
+                await InvokeAsync(StateHasChanged);
+            }
+            _timer.Dispose(); // Dispose the timer after use
+            await gameContainerRef.FocusAsync(); // Focus the game container to capture key events
+            game!.Updated += OnGameUpdate;
+            game.StartGame();
+        }
+    }
+
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        //Console.WriteLine("HandleKeyDown "+e.Key);
+        var newDirection = e.Key switch
+        {
+            "ArrowUp" => Direction.Up,
+            "ArrowDown" => Direction.Down,
+            "ArrowLeft" => Direction.Left,
+            "ArrowRight" => Direction.Right,
+            _ => Direction.None
+        };
+        if (newDirection != Direction.None)
+            game?.PushMove(newDirection);
+    }
+
+    private string GetTileClass(TileType tileType) => tileType switch
+    {
+        TileType.Empty => "empty",
+        TileType.Wall => "wall",
+        TileType.Dot => "dot",
+        TileType.PowerPellet => "power-pellet",
+        TileType.PacMan => "pacman " + game?.CurrentDirection.ToString().ToLower(),
+        TileType.Blinky => "ghost blinky",
+        TileType.Inky => "ghost inky",
+        TileType.Pinky => "ghost pinky",
+        TileType.Clyde => "ghost clyde",
+        _ => "empty"
+    };
+
+
+    public void Dispose()
+    {
+        GameTimer?.Dispose();
+    }
+}

@@ -1,0 +1,141 @@
+.game-container {
+    --main-bg-color: black;
+    --wall-color: #798af6;
+    --pacman-color: yellow;
+    --pellet-color: white;
+    --power-pellet-color: orange;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0px;
+    background-color: var(--main-bg-color);
+    width: 100%;
+    height: 100%;
+}
+
+.game-board {
+    border-collapse: collapse;
+    background-color: var(--main-bg-color);
+    border: 1px solid var(--wall-color);
+}
+
+    .game-board td {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+    }
+
+.empty {
+    background-color: var(--main-bg-color);
+}
+
+.wall {
+    background-color: var(--wall-color);
+    border-radius: 0px;
+}
+
+.dot {
+    background-color: var(--pellet-color);
+    clip-path: circle(10% at 50% 50%);
+}
+
+.power-pellet {
+    background-color: var(--power-pellet-color);
+    clip-path: circle(30% at 50% 50%);
+}
+
+.pacman {
+    background-color: var(--pacman-color);
+    border-radius: 50%;
+    clip-path: polygon(0% 0%, 100% 0%, 100% 21%, 50% 50%, 100% 74%, 100% 100%, 0% 100%);
+    animation: chomp 0.5s linear infinite;
+}
+
+    .pacman.right {
+        transform: rotate(0deg);
+    }
+
+    .pacman.none {
+        transform: rotate(0deg);
+    }
+
+    .pacman.down {
+        transform: rotate(90deg);
+    }
+
+    .pacman.left {
+        transform: rotate(180deg);
+    }
+
+    .pacman.up {
+        transform: rotate(-90deg);
+    }
+
+.ghost {
+    border-radius: 50% 50% 0 0;
+}
+
+    .ghost.blinky {
+        background-color: red;
+    }
+
+    .ghost.pinky {
+        background-color: pink;
+    }
+
+    .ghost.inky {
+        background-color: cyan;
+    }
+
+    .ghost.clyde {
+        background-color: orange;
+    }
+
+.game-info {
+    margin-top: 20px;
+    color: #fff;
+    font-size: 24px;
+    font-family: 'Arial', sans-serif;
+    display: flex;
+    flex-direction: column;
+}
+
+.game-over {
+    margin-top: 20px;
+    text-align: center;
+    color: #fff;
+}
+
+.btn {
+    background-color: #00f;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 1rem;
+    transition: background-color 0.2s;
+}
+
+    .btn:hover {
+        background-color: #00d;
+    }
+
+@keyframes chomp {
+    0% {
+        clip-path: polygon(0% 0%, 100% 0%, 100% 21%, 50% 50%, 100% 74%, 100% 100%, 0% 100%);
+    }
+
+    33% {
+        clip-path: polygon(0% 0%, 100% 0%, 100% 31.5%, 50% 50%, 100% 63.5%, 100% 100%, 0% 100%);
+    }
+
+    66% {
+        clip-path: polygon(0% 0%, 100% 0%, 100% 42.2%, 50% 50%, 100% 52.8%, 100% 100%, 0% 100%);
+    }
+
+    100% {
+        clip-path: none;
+    }
+}
