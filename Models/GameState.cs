@@ -276,13 +276,11 @@ namespace pacman.Models
             PacmanPosition = newPosition;
         }
 
+        private bool checkCollision() => Ghosts.Any(ghost => ghost.Position == PacmanPosition);
+
         private void CheckGameOver()
         {
-            // Check if Pacman collides with a ghost
-            bool collidesWithGhost = Ghosts.Any(ghost =>
-                ghost.Position.X == PacmanPosition.X && ghost.Position.Y == PacmanPosition.Y);
-
-            if (collidesWithGhost && !IsPoweredUp)
+            if (!IsPoweredUp && checkCollision())
             {
                 IsGameOver = true;
             }
