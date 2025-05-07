@@ -1,6 +1,6 @@
 ﻿@if(IsVisible)
 {
-    <div class="overlay" @onclick="() => IsVisible = false">
+    <div class="overlay" @onclick="() => IsVisible = IgnoreClick">
         <div class="overlay-content">
             @ChildContent
         </div>
@@ -9,5 +9,6 @@
 
 @code {
     [Parameter] public bool IsVisible { get; set; } = false;
+    [Parameter] public bool IgnoreClick { get; set; } = false;
     [Parameter] public RenderFragment? ChildContent { get; set; } = null;
 }

@@ -29,27 +29,27 @@ namespace pacman.Models
 
     public record Position(int X, int Y);
 
-    public class Board
+    public class Board<T> where T : struct
     {
-        public TileType[,] Tiles { get; set; }
-        public int Width => Tiles.GetLength(1);
-        public int Height => Tiles.GetLength(0);
+        public T[,] Cells { get; set; }
+        public int Width => Cells.GetLength(1);
+        public int Height => Cells.GetLength(0);
 
 
         public Board(int width, int height)
         {
-            Tiles = new TileType[height, width];
+            Cells = new T[height, width];
         }
 
-        public TileType this[int row, int col] 
+        public T this[int row, int col] 
         {
-            get => Tiles[row,col];
-            set => Tiles[row,col] = value;
+            get => Cells[row,col];
+            set => Cells[row,col] = value;
         }
-        public TileType this[Position pos] 
+        public T this[Position pos] 
         {
-            get => Tiles[pos.Y,pos.X];
-            set => Tiles[pos.Y,pos.X] = value;
+            get => Cells[pos.Y,pos.X];
+            set => Cells[pos.Y,pos.X] = value;
         }
     }
 
@@ -57,22 +57,36 @@ namespace pacman.Models
     {
         public TileType Name { get; set; }
 
-        public Position Position { get; set; }
-        public Direction Direction { get; set; }
+        public Position Position { get; set; } = new Position(0, 0);
+        public Position InitialPosition { get; set; } = new Position(0, 0);
+        public Direction Direction { get; set; } = Direction.None;
+    }
+
+    [Flags]
+    public enum GameStatus
+    {
+        None     = 0b000,
+        Running  = 0b001,
+        GameOver = 0b010,
+        Victory  = 0b011,
     }
 
     public class GameState : IDisposable
     {
 
-        public readonly int TimerInterval = 150;
+        public readonly TimeSpan TimerInterval = TimeSpan.FromMilliseconds(150);
 
-        public Board Board { get; private set; }
-        Board FoodMap = null;
+        public Board<TileType> Board { get; private set; }
+        Board<TileType> FoodMap = null;
         public Position PacmanPosition { get; set; }
         public Ghost[] Ghosts { get; set; }
         public int Score { get; set; }
-        public bool IsGameOver { get; set; }
-        public bool IsStarted { get; private set; } = false;
+        public GameStatus Status { get; private set; } = GameStatus.None;
+        public bool IsGameOver => Status.HasFlag(GameStatus.GameOver);
+        public bool IsRunning => Status.HasFlag(GameStatus.Running);
+        public bool GameOver => Status.HasFlag(GameStatus.GameOver);
+        public bool IsVictory => Status.HasFlag(GameStatus.Victory);
+
         public bool IsPoweredUp { get; set; }
         public int RemainingDots { get; private set; }
 
@@ -99,14 +113,13 @@ namespace pacman.Models
             InitializeGame();
         }
 
-        private void InitializeGame()
+        public void InitializeGame()
         {
-            //Board = new TileType[28, 31]; // Standard Pacman board size
-            //FoodMap = new TileType[28, 31];
             Score = 0;
-            IsGameOver = false;
+            Status = GameStatus.None;
             IsPoweredUp = false;
             LoadBoard(KnownBoards.layout1);
+            currentDirection = Direction.None;
         }
 
         static TileType asTile(char c) => c switch
@@ -114,6 +127,11 @@ namespace pacman.Models
             'w' => TileType.Wall,
             '.' => TileType.Dot,
             'o' => TileType.PowerPellet,
+            'P' => TileType.PacMan,
+            'b' => TileType.Blinky,
+            'p' => TileType.Pinky,
+            'i' => TileType.Inky,
+            'c' => TileType.Clyde,
             ' ' => TileType.Empty,
             '-' => TileType.Empty,
             _ => TileType.Empty
@@ -124,51 +142,69 @@ namespace pacman.Models
             RemainingDots = 0;
             int numRows = layout.Length;
             int numCols = layout.Max(s=>s.Length);
-            Board = new Board(height:numRows, width:numCols);
-            FoodMap = new Board(height: numRows, width: numCols);
+            Board = new (height:numRows, width:numCols);
+            FoodMap = new (height: numRows, width: numCols);
+
+            Ghosts = [
+                 new Ghost {Name = TileType.Pinky},
+                 new Ghost {Name = TileType.Blinky},
+                 new Ghost {Name = TileType.Inky},
+                 new Ghost {Name = TileType.Clyde}
+            ];
+
             for (int r = 0; r < numRows; r++)
             {
                 for (int c = 0; c < layout[r].Length; c++)
                 {
-                    FoodMap[r,c] = Board[r,c] = asTile(layout[r][c]);
-                    if (Board[r,c] == TileType.Dot)
+                    var tile = asTile(layout[r][c]);
+                    Board[r,c] = tile;
+                    FoodMap[r, c] = TileType.Empty;
+                    switch (tile)
                     {
-                        RemainingDots++;
+                        case TileType.Dot:
+                            RemainingDots++;
+                            FoodMap[r, c] = TileType.Dot;
+                            break;
+                        case TileType.PowerPellet:
+                            RemainingDots++;
+                            FoodMap[r, c] = TileType.PowerPellet;
+                            break;
+                        case TileType.PacMan:
+                            PacmanPosition = new Position(c, r);
+                            break;
+                        case TileType.Pinky:
+                            Ghosts[0].Position = Ghosts[0].InitialPosition = new Position(c, r);
+                            break;
+                        case TileType.Blinky:
+                            Ghosts[1].Position = Ghosts[1].InitialPosition = new Position(c, r);
+                            break;
+                        case TileType.Inky:
+                            Ghosts[2].Position = Ghosts[2].InitialPosition = new Position(c, r);
+                            break;
+                        case TileType.Clyde:
+                            Ghosts[3].Position = Ghosts[3].InitialPosition = new Position(c, r);
+                            break;
+                        default:
+                            break;
                     }
                 }
             }
 
-            // Set initial Pacman position
-            PacmanPosition = new Position(14, 23);
-            Board[PacmanPosition] = TileType.PacMan;
-
-            // Set initial ghost positions
-            Ghosts = [
-                 new Ghost {Name = TileType.Pinky,  Position=new Position(13, 14),Direction=Direction.None},
-                 new Ghost {Name = TileType.Blinky, Position=new Position(14, 14),Direction=Direction.None},
-                 new Ghost {Name = TileType.Inky,   Position=new Position(15, 14),Direction=Direction.None},
-                 new Ghost {Name = TileType.Clyde,  Position=new Position(16, 14),Direction=Direction.None}
-            ];
-
-            foreach (var ghost in Ghosts)
-            {
-                Board[ghost.Position] =  ghost.Name;
-            }
         }
 
-
+        public TimeSpan ElapsedTime = TimeSpan.Zero;
+        private TimeSpan remainingPoweredTime = TimeSpan.Zero;
         public void StartGame()
         {
             timer?.Dispose();
-            timer = new PeriodicTimer(TimeSpan.FromMilliseconds(TimerInterval));
-            IsStarted = true;
+            timer = new PeriodicTimer(TimerInterval);
+            Status = GameStatus.Running;
             gameLoop = Task.Run(GameLoop);
         }
 
         public void StopGame()
         {
-            IsStarted = false;
-            IsGameOver = true;
+            Status = GameStatus.GameOver;
             gameLoop?.Wait();
             timer?.Dispose();
             timer = null;
@@ -178,11 +214,33 @@ namespace pacman.Models
         {
             while (!IsGameOver)
             {
-                await timer!.WaitForNextTickAsync();
                 NextMove();
                 NextGhostMove();
                 CheckGameOver();
                 Updated?.Invoke();
+                await timer!.WaitForNextTickAsync();
+                ElapsedTime += TimerInterval;
+                if (IsPoweredUp)
+                {
+                    remainingPoweredTime -= TimerInterval;
+                    if (remainingPoweredTime <= TimeSpan.Zero)
+                    {
+                        IsPoweredUp = false;
+                        remainingPoweredTime = TimeSpan.Zero;
+                    }
+                }
+            }
+        }
+
+        void MoveGhost(Ghost ghost, Position newGhostPosition, Direction newDirection)
+        {
+            Position ghostPosition = ghost.Position;
+            if (IsValidMove(newGhostPosition))
+            {
+                Board[ghost.Position] = FoodMap[ghost.Position];
+                Board[newGhostPosition] = ghost.Name;
+                ghost.Position = newGhostPosition;
+                ghost.Direction = newDirection;
             }
         }
 
@@ -194,14 +252,7 @@ namespace pacman.Models
                 var ghost= Ghosts[i];
                 Position ghostPosition = ghost.Position;
                 Direction ghostDirection = ghostMoves[i];
-                Position newGhostPosition = CalculateNewPosition(ghostPosition, ghostDirection);
-                if (IsValidMove(newGhostPosition))
-                {
-                    Board[ghost.Position] = FoodMap[ghost.Position];
-                    Board[newGhostPosition] = ghost.Name;
-                    ghost.Position = newGhostPosition;
-                    ghost.Direction = ghostDirection;
-                }
+                MoveGhost(ghost,CalculateNewPosition(ghostPosition, ghostDirection),ghostDirection);
             }
         }
 
@@ -268,7 +319,7 @@ namespace pacman.Models
                 Score += 50;
                 FoodMap[newPosition] = TileType.Empty;
                 IsPoweredUp = true;
-                // TODO: Implement power pellet timer
+                remainingPoweredTime = TimeSpan.FromSeconds(5); // Power-up duration
             }
 
             // Update Pacman's position
@@ -276,17 +327,29 @@ namespace pacman.Models
             PacmanPosition = newPosition;
         }
 
-        private bool checkCollision() => Ghosts.Any(ghost => ghost.Position == PacmanPosition);
 
         private void CheckGameOver()
         {
-            if (!IsPoweredUp && checkCollision())
+            if (RemainingDots == 0)
             {
-                IsGameOver = true;
+                Status = GameStatus.GameOver | GameStatus.Victory;
+                return;
             }
-            else if (RemainingDots == 0)
+            foreach (var ghost in Ghosts)
             {
-                IsGameOver = true; // Victory!
+                if (ghost.Position == PacmanPosition)
+                {
+                    if (IsPoweredUp)
+                    {
+                        Score += 200; // Bonus for eating a ghost
+                        MoveGhost(ghost, ghost.InitialPosition, Direction.None); // Reset ghost position
+                    }
+                    else
+                    {
+                        Status = GameStatus.GameOver;
+                        return;
+                    }
+                }
             }
         }
 

@@ -5,11 +5,12 @@
 @using pacman.Components.Shared
 
 @implements IDisposable
+
 <div>
-    <Overlay IsVisible="@(countDown>0)">
+    <Overlay IsVisible="@(countDown>0)" IgnoreClick=true>
         <div style="color:white; font-size:128px">@countDown</div>
     </Overlay>
-    <Overlay IsVisible="@((game?.IsGameOver).GetValueOrDefault(false))">
+    <Overlay IsVisible="@(game?.IsGameOver ?? false)">
         <div style="color:white; font-size:64px">Game Over!</div>>
     </Overlay>
     <div @ref="gameContainerRef" class="game-container" tabindex="0" @onkeydown="HandleKeyDown">
@@ -28,6 +29,7 @@
             </tbody>
         </table>
         <div class="game-info">
+            <div>Time: @game.ElapsedTime</div>
             <div>Score: @game.Score</div>
             <button class="btn" @onclick="StartStopGame">
                 @GetButtonText()
@@ -46,12 +48,13 @@
     protected override void OnInitialized()
     {
         game = new GameState();
+        game.Updated += OnGameUpdate;
         base.OnInitialized();
     }
 
     string GetButtonText()
     {
-        return (game?.IsStarted).GetValueOrDefault(false) ? "Stop" : "Start";
+        return (game?.IsRunning).GetValueOrDefault(false) ? "Stop" : "Start";
     }
 
     void OnGameUpdate() => InvokeAsync(StateHasChanged); // Update the UI when the game state changes
@@ -59,17 +62,18 @@
 
     async Task StartStopGame()
     {
-        bool wasRunning = game?.IsStarted ?? false;
+        bool wasRunning = game?.IsRunning ?? false;
         if (wasRunning)
         {
             // must stop the game
-            game!.Updated -= OnGameUpdate;
+            //game!.Updated -= OnGameUpdate;
             game.StopGame();
-            game.Dispose();
-            game = new GameState();
+            game.InitializeGame();
         }
         else
         {
+            if(game.IsGameOver)
+                game.InitializeGame();
             // must start the game
             countDown = 3; // Set countdown to 3 seconds
             await InvokeAsync(StateHasChanged); // Update the UI immediately)
@@ -82,7 +86,6 @@
             }
             _timer.Dispose(); // Dispose the timer after use
             await gameContainerRef.FocusAsync(); // Focus the game container to capture key events
-            game!.Updated += OnGameUpdate;
             game.StartGame();
         }
     }
@@ -109,7 +112,7 @@
         TileType.Wall => "wall",
         TileType.Dot => "dot",
         TileType.PowerPellet => "power-pellet",
-        TileType.PacMan => "pacman " + game?.CurrentDirection.ToString().ToLower(),
+        TileType.PacMan => "pacman " + game?.CurrentDirection.ToString().ToLower() + (game.IsPoweredUp ? " powered" : ""),
         TileType.Blinky => "ghost blinky",
         TileType.Inky => "ghost inky",
         TileType.Pinky => "ghost pinky",

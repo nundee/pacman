@@ -2,6 +2,7 @@
     --main-bg-color: black;
     --wall-color: #798af6;
     --pacman-color: yellow;
+    --pacman-powered-color: darkred;
     --pellet-color: white;
     --power-pellet-color: orange;
     display: flex;
@@ -69,6 +70,9 @@
 
     .pacman.up {
         transform: rotate(-90deg);
+    }
+    .pacman.powered {
+        background-color: var(--pacman-powered-color);
     }
 
 .ghost {
