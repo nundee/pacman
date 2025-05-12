@@ -1,10 +1,11 @@
 @page "/"
 @rendermode InteractiveServer
+@inject IJSRuntime JS
 
 @using pacman.Models
 @using pacman.Components.Shared
 
-@implements IDisposable
+@implements IAsyncDisposable
 
 <div>
     <Overlay IsVisible="@(countDown>0)" IgnoreClick=true>
@@ -36,6 +37,9 @@
             </button>
         </div>
     </div>
+    <audio id="game-sound" loop>
+        <source src="MissionImpossibleTheme.mp3" type="audio/mp3" />
+    </audio>
 </div>
 
 @code {
@@ -68,6 +72,8 @@
             // must stop the game
             //game!.Updated -= OnGameUpdate;
             game.StopGame();
+            if (module is not null)
+                await module!.InvokeVoidAsync("StopSound");
             game.InitializeGame();
         }
         else
@@ -87,6 +93,8 @@
             _timer.Dispose(); // Dispose the timer after use
             await gameContainerRef.FocusAsync(); // Focus the game container to capture key events
             game.StartGame();
+            if (module is not null)
+                await module!.InvokeVoidAsync("PlaySound"); // Play the sound
         }
     }
 
@@ -121,8 +129,29 @@
     };
 
 
-    public void Dispose()
+    private IJSObjectReference? module;
+
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            module = await JS.InvokeAsync<IJSObjectReference>("import",
+                "./Components/Pages/PacmanGame.razor.js");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
     {
         GameTimer?.Dispose();
+        if (module is not null)
+        {
+            try
+            {
+                await module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
     }
 }
